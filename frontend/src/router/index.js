@@ -1,0 +1,61 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
+import LoginView from '../views/LoginView.vue'
+import RegisterView from '../views/RegisterView.vue'
+import DashboardView from '../views/DashboardView.vue'
+import ProfileView from '../views/ProfileView.vue'
+
+const routes = [
+  {
+    path: '/',
+    redirect: '/dashboard',
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: LoginView,
+    meta: { public: true },
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterView,
+    meta: { public: true },
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: DashboardView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: ProfileView,
+    meta: { requiresAuth: true },
+  },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+})
+
+// Route guard
+router.beforeEach((to, from, next) => {
+  const { isAuthenticated } = useAuth()
+
+  // Check if route requires authentication
+  if (to.meta.requiresAuth && !isAuthenticated.value) {
+    // Redirect to login if not authenticated
+    next('/login')
+  } else if (to.meta.public && isAuthenticated.value) {
+    // Redirect to dashboard if already authenticated and trying to access public routes
+    next('/dashboard')
+  } else {
+    // Allow navigation
+    next()
+  }
+})
+
+export default router
