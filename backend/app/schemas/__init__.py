@@ -1,5 +1,12 @@
 """Pydantic schemas for request/response validation."""
 
+from app.schemas.activity import (
+    ActivityCreateSchema,
+    ActivityListResponseSchema,
+    ActivityResponseSchema,
+    ActivityUpdateSchema,
+)
+from app.schemas.attachment import AttachmentResponseSchema
 from app.schemas.auth import AuthResponseSchema
 from app.schemas.contact import (
     ContactCreateSchema,
@@ -18,6 +25,11 @@ from app.schemas.user import (
 )
 
 __all__ = [
+    "ActivityCreateSchema",
+    "ActivityListResponseSchema",
+    "ActivityResponseSchema",
+    "ActivityUpdateSchema",
+    "AttachmentResponseSchema",
     "AuthResponseSchema",
     "ContactCreateSchema",
     "ContactListResponseSchema",

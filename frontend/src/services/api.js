@@ -42,6 +42,18 @@ function getAuthHeaders() {
   return headers
 }
 
+function getAuthHeadersMultipart() {
+  const token = localStorage.getItem('sessionToken')
+  const headers = {}
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // Don't set Content-Type for multipart/form-data, browser will set it with boundary
+  return headers
+}
+
 export async function apiGet(endpoint) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'GET',
@@ -116,6 +128,74 @@ export async function updateContactStage(contactId, stage) {
 
 export async function getPipelineStats() {
   return apiGet('/contacts/pipeline-stats')
+}
+
+// Activity API methods
+export async function getActivitiesForContact(contactId) {
+  return apiGet(`/contacts/${contactId}/activities`)
+}
+
+export async function createActivity(contactId, activityData) {
+  return apiPost(`/contacts/${contactId}/activities`, activityData)
+}
+
+export async function getActivityById(activityId) {
+  return apiGet(`/activities/${activityId}`)
+}
+
+export async function updateActivity(activityId, activityData) {
+  return apiPut(`/activities/${activityId}`, activityData)
+}
+
+export async function deleteActivity(activityId) {
+  return apiDelete(`/activities/${activityId}`)
+}
+
+export async function getAllActivities(params = {}) {
+  const queryParams = new URLSearchParams()
+
+  if (params.type) queryParams.append('type', params.type)
+  if (params.search) queryParams.append('search', params.search)
+
+  const query = queryParams.toString()
+  return apiGet(`/activities${query ? '?' + query : ''}`)
+}
+
+// Attachment API methods
+export async function uploadAttachment(activityId, file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${API_BASE_URL}/activities/${activityId}/attachments`, {
+    method: 'POST',
+    headers: getAuthHeadersMultipart(),
+    body: formData,
+  })
+
+  return handleResponse(response)
+}
+
+export async function downloadAttachment(activityId, attachmentId) {
+  const token = localStorage.getItem('sessionToken')
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_BASE_URL}/activities/${activityId}/attachments/${attachmentId}`, {
+    method: 'GET',
+    headers,
+  })
+
+  if (!response.ok) {
+    throw new ApiError('Failed to download attachment', response.status)
+  }
+
+  return response.blob()
+}
+
+export async function deleteAttachment(activityId, attachmentId) {
+  return apiDelete(`/activities/${activityId}/attachments/${attachmentId}`)
 }
 
 export { ApiError }

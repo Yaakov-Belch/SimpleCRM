@@ -31,5 +31,10 @@ class Contact(Base):
         onupdate=datetime.utcnow
     )
 
-    # Relationship to user
+    # Relationships
     user = relationship("User", back_populates="contacts")
+    activities = relationship(
+        "Activity",
+        back_populates="contact",
+        cascade="all, delete-orphan"
+    )

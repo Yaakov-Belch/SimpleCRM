@@ -8,7 +8,7 @@
 
 3. [x] Pipeline Stage Management — Create a 4-stage pipeline (Lead, Qualified, Proposal, Client) with the ability to assign contacts to stages and view stage-wise contact distribution. `S`
 
-4. [ ] Activity Timeline & Notes — Implement activity logging system where users can record calls, meetings, emails, and general notes with timestamps, creating a chronological timeline per contact. `M`
+4. [x] Activity Timeline & Notes — Implement activity logging system where users can record calls, meetings, emails, and general notes with timestamps, creating a chronological timeline per contact. `M`
 
 5. [ ] Follow-Up Reminder System — Build automated reminder creation based on last interaction date with configurable reminder rules, dashboard display of overdue follow-ups, and notification system. `M`
 

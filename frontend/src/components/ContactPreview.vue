@@ -3,7 +3,7 @@
     <div v-if="contact">
       <!-- Header with Actions -->
       <div class="flex justify-between items-start mb-6">
-        <h2 class="text-xl font-bold text-gray-900">Contact Details</h2>
+        <h2 class="text-xl font-bold text-gray-900">{{ contact.name }}</h2>
         <div class="flex gap-2">
           <button
             @click="$emit('edit', contact)"
@@ -20,13 +20,41 @@
         </div>
       </div>
 
-      <!-- Contact Fields -->
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-          <p class="text-base text-gray-900">{{ contact.name }}</p>
-        </div>
+      <!-- Tabs -->
+      <div class="mb-6 border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button
+            @click="activeTab = 'timeline'"
+            :class="[
+              'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'timeline'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+          >
+            Timeline
+          </button>
+          <button
+            @click="activeTab = 'contact-info'"
+            :class="[
+              'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'contact-info'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+          >
+            Contact Info
+          </button>
+        </nav>
+      </div>
 
+      <!-- Tab Content -->
+      <div v-show="activeTab === 'timeline'">
+        <ActivityTimeline :contact-id="contact.id" />
+      </div>
+
+      <div v-show="activeTab === 'contact-info'" class="space-y-4">
+        <!-- Contact Fields -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <p class="text-base text-gray-900">
@@ -107,6 +135,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import StageSelector from './StageSelector.vue'
+import ActivityTimeline from './ActivityTimeline.vue'
 
 const props = defineProps({
   contact: {
@@ -117,12 +146,15 @@ const props = defineProps({
 
 const emit = defineEmits(['edit', 'delete', 'stage-updated'])
 
+const activeTab = ref('timeline')
 const currentStage = ref(props.contact?.pipeline_stage || 'Lead')
 
 // Watch for contact changes
 watch(() => props.contact, (newContact) => {
   if (newContact) {
     currentStage.value = newContact.pipeline_stage
+    // Reset to timeline tab when contact changes
+    activeTab.value = 'timeline'
   }
 }, { immediate: true })
 

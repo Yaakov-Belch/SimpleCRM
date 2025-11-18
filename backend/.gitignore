@@ -44,3 +44,7 @@ instance/
 # Migrations (if using Alembic/Flask-Migrate) - uncomment if needed
 # migrations/versions/*.py
 # !migrations/versions/__init__.py
+
+# Activity file uploads
+uploads/
+!uploads/README.md
