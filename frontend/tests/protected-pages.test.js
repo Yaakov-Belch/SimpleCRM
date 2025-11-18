@@ -64,7 +64,7 @@ describe('Dashboard Page', () => {
     expect(wrapper.text()).toContain('John Doe')
   })
 
-  it('should display placeholder content', async () => {
+  it('should display pipeline overview content', async () => {
     wrapper = mount(DashboardView, {
       global: {
         plugins: [router],
@@ -73,7 +73,7 @@ describe('Dashboard Page', () => {
 
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('Dashboard features coming soon')
+    expect(wrapper.text()).toContain('Manage your contacts and track your sales pipeline')
   })
 })
 

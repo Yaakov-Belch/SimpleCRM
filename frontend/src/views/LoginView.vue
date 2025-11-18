@@ -106,7 +106,7 @@ async function handleSubmit() {
     const result = await login(email.value, password.value)
 
     if (result.success) {
-      router.push('/dashboard')
+      router.push('/contacts')
     } else {
       generalError.value = result.error
     }

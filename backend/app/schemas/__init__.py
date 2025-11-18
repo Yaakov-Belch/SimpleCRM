@@ -13,6 +13,7 @@ from app.schemas.contact import (
     ContactListResponseSchema,
     ContactResponseSchema,
     ContactUpdateSchema,
+    FilterCountsResponseSchema,
     PipelineStatsResponseSchema,
 )
 from app.schemas.error import ErrorDetail, ErrorResponse
@@ -35,6 +36,7 @@ __all__ = [
     "ContactListResponseSchema",
     "ContactResponseSchema",
     "ContactUpdateSchema",
+    "FilterCountsResponseSchema",
     "PipelineStatsResponseSchema",
     "ErrorDetail",
     "ErrorResponse",

@@ -64,22 +64,6 @@
         <p v-if="errors.notes" class="mt-1 text-sm text-red-600">{{ errors.notes }}</p>
       </div>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Pipeline Stage
-          <span class="text-red-500">*</span>
-        </label>
-        <select
-          v-model="formData.pipeline_stage"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="Lead">Lead</option>
-          <option value="Qualified">Qualified</option>
-          <option value="Proposal">Proposal</option>
-          <option value="Client">Client</option>
-        </select>
-      </div>
-
       <div class="flex gap-3 pt-4">
         <button
           type="submit"
@@ -125,8 +109,7 @@ const formData = ref({
   company: '',
   job_title: '',
   website: '',
-  notes: '',
-  pipeline_stage: 'Lead'
+  notes: ''
 })
 
 const errors = ref({})
@@ -185,8 +168,7 @@ async function handleSubmit() {
       company: formData.value.company || undefined,
       job_title: formData.value.job_title || undefined,
       website: formData.value.website || undefined,
-      notes: formData.value.notes || undefined,
-      pipeline_stage: formData.value.pipeline_stage
+      notes: formData.value.notes || undefined
     }
 
     let response
@@ -230,8 +212,7 @@ async function loadContact() {
       company: contact.company || '',
       job_title: contact.job_title || '',
       website: contact.website || '',
-      notes: contact.notes || '',
-      pipeline_stage: contact.pipeline_stage || 'Lead'
+      notes: contact.notes || ''
     }
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {

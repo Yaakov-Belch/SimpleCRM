@@ -132,4 +132,134 @@ describe('ActivityItem', () => {
       expect(badge.classes()).toContain(colorClass)
     })
   })
+
+  // Task Group 4 Tests
+
+  it('displays pipeline stage badge when stage differs from previous activity', () => {
+    const activityWithStageChange = {
+      ...mockActivity,
+      pipeline_stage: 'Qualified'
+    }
+
+    const previousActivity = {
+      id: 0,
+      pipeline_stage: 'Lead'
+    }
+
+    const wrapper = mount(ActivityItem, {
+      props: {
+        activity: activityWithStageChange,
+        previousActivity: previousActivity
+      }
+    })
+
+    // Should show stage badge
+    expect(wrapper.text()).toContain('Qualified')
+
+    // Should have both type and stage badge
+    const badges = wrapper.findAll('.rounded-full')
+    expect(badges.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('does not display pipeline stage badge when stage matches previous activity', () => {
+    const activityWithSameStage = {
+      ...mockActivity,
+      pipeline_stage: 'Lead'
+    }
+
+    const previousActivity = {
+      id: 0,
+      pipeline_stage: 'Lead'
+    }
+
+    const wrapper = mount(ActivityItem, {
+      props: {
+        activity: activityWithSameStage,
+        previousActivity: previousActivity
+      }
+    })
+
+    // Should not show duplicate stage badge text
+    const text = wrapper.text()
+    // Count occurrences of "Lead" - should only appear once if at all (not as a stage badge)
+    const leadCount = (text.match(/Lead/g) || []).length
+    expect(leadCount).toBe(0) // No "Lead" text should appear since it matches previous
+  })
+
+  it('displays pipeline stage badge when no previous activity exists', () => {
+    const activityWithStage = {
+      ...mockActivity,
+      pipeline_stage: 'Lead'
+    }
+
+    const wrapper = mount(ActivityItem, {
+      props: {
+        activity: activityWithStage,
+        previousActivity: null
+      }
+    })
+
+    // Should show stage badge when no previous activity
+    expect(wrapper.text()).toContain('Lead')
+  })
+
+  it('applies correct colors to active pipeline stage badges', () => {
+    const activeStages = [
+      { stage: 'Lead', expectedClass: 'bg-yellow-100' },
+      { stage: 'Qualified', expectedClass: 'bg-blue-100' },
+      { stage: 'Proposal', expectedClass: 'bg-purple-100' },
+      { stage: 'Client', expectedClass: 'bg-green-100' }
+    ]
+
+    activeStages.forEach(({ stage, expectedClass }) => {
+      const wrapper = mount(ActivityItem, {
+        props: {
+          activity: {
+            ...mockActivity,
+            pipeline_stage: stage
+          },
+          previousActivity: {
+            id: 0,
+            pipeline_stage: 'Different Stage' // Ensure badge shows
+          }
+        }
+      })
+
+      // Find all badges
+      const badges = wrapper.findAll('.rounded-full')
+      // Check if any badge has the expected class
+      const hasStageBadge = badges.some(badge => badge.classes().includes(expectedClass))
+      expect(hasStageBadge).toBe(true)
+    })
+  })
+
+  it('applies correct colors to passive pipeline stage badges', () => {
+    const passiveStages = [
+      { stage: 'Qualified Out', expectedClass: 'bg-gray-100' },
+      { stage: 'Lost Proposal', expectedClass: 'bg-red-100' },
+      { stage: 'Work Completed', expectedClass: 'bg-teal-100' },
+      { stage: 'Archived', expectedClass: 'bg-slate-100' }
+    ]
+
+    passiveStages.forEach(({ stage, expectedClass }) => {
+      const wrapper = mount(ActivityItem, {
+        props: {
+          activity: {
+            ...mockActivity,
+            pipeline_stage: stage
+          },
+          previousActivity: {
+            id: 0,
+            pipeline_stage: 'Different Stage' // Ensure badge shows
+          }
+        }
+      })
+
+      // Find all badges
+      const badges = wrapper.findAll('.rounded-full')
+      // Check if any badge has the expected class
+      const hasStageBadge = badges.some(badge => badge.classes().includes(expectedClass))
+      expect(hasStageBadge).toBe(true)
+    })
+  })
 })

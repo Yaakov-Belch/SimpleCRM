@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import ContactPreview from '../ContactPreview.vue'
 import ActivityTimeline from '../ActivityTimeline.vue'
-import StageSelector from '../StageSelector.vue'
 import * as api from '../../services/api'
 
 vi.mock('../../services/api', () => ({
@@ -26,6 +25,7 @@ describe('ContactPreview', () => {
     job_title: 'Manager',
     website: 'https://example.com',
     notes: 'Test notes',
+    current_pipeline_stage: 'Lead',
     pipeline_stage: 'Lead',
     created_at: '2024-01-01T00:00:00',
     updated_at: '2024-01-02T00:00:00'
@@ -115,10 +115,58 @@ describe('ContactPreview', () => {
 
     expect(wrapper.text()).toContain('john@example.com')
     expect(wrapper.text()).toContain('123-456-7890')
-    expect(wrapper.text()).toContain('Test Company')
-    expect(wrapper.text()).toContain('Manager')
     expect(wrapper.text()).toContain('https://example.com')
     expect(wrapper.text()).toContain('Test notes')
+  })
+
+  it('displays job title and company in header above tabs', () => {
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: mockContact
+      }
+    })
+
+    const header = wrapper.find('.flex-1')
+    expect(header.text()).toContain('Manager')
+    expect(header.text()).toContain('at')
+    expect(header.text()).toContain('Test Company')
+  })
+
+  it('displays current pipeline stage badge in header', () => {
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: mockContact
+      }
+    })
+
+    const badge = wrapper.find('.px-3.py-1.rounded-full')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('Lead')
+    expect(badge.classes()).toContain('bg-yellow-100')
+    expect(badge.classes()).toContain('text-yellow-800')
+  })
+
+  it('does not display StageSelector component in Contact Info tab', async () => {
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: mockContact
+      }
+    })
+
+    // Switch to Contact Info tab
+    const tabs = wrapper.findAll('nav button')
+    await tabs[1].trigger('click')
+
+    await wrapper.vm.$nextTick()
+
+    // StageSelector component should not be imported or rendered
+    const contactInfoDiv = wrapper.find('[class="space-y-4"]')
+    expect(contactInfoDiv.exists()).toBe(true)
+
+    // Check that there's no label for Pipeline Stage
+    const labels = wrapper.findAll('label')
+    const hasStageLabel = labels.some(label => label.text().includes('Pipeline Stage'))
+    expect(hasStageLabel).toBe(false)
   })
 
   it('renders ActivityTimeline component with contact ID', async () => {
@@ -186,5 +234,57 @@ describe('ContactPreview', () => {
     })
 
     expect(wrapper.text()).toContain('Select a contact to view details')
+  })
+
+  it('formats job title and company correctly when both exist', () => {
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: mockContact
+      }
+    })
+
+    const jobCompanyDiv = wrapper.find('.text-sm.text-gray-600')
+    expect(jobCompanyDiv.text()).toContain('Manager at Test Company')
+  })
+
+  it('displays only company when job title is missing', () => {
+    const contactWithoutTitle = { ...mockContact, job_title: null }
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: contactWithoutTitle
+      }
+    })
+
+    const jobCompanyDiv = wrapper.find('.text-sm.text-gray-600')
+    expect(jobCompanyDiv.text()).toContain('Test Company')
+    expect(jobCompanyDiv.text()).not.toContain(' at ')
+  })
+
+  it('links company to website when website exists', () => {
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: mockContact
+      }
+    })
+
+    const companyLink = wrapper.find('a[href="https://example.com"]')
+    expect(companyLink.exists()).toBe(true)
+    expect(companyLink.text()).toBe('Test Company')
+    expect(companyLink.attributes('target')).toBe('_blank')
+  })
+
+  it('displays company as plain text when no website', () => {
+    const contactWithoutWebsite = { ...mockContact, website: null }
+    const wrapper = mount(ContactPreview, {
+      props: {
+        contact: contactWithoutWebsite
+      }
+    })
+
+    const jobCompanyDiv = wrapper.find('.text-sm.text-gray-600')
+    expect(jobCompanyDiv.text()).toContain('Test Company')
+    // Should not be a link
+    const companyLinks = wrapper.findAll('a').filter(link => link.text() === 'Test Company')
+    expect(companyLinks.length).toBe(0)
   })
 })

@@ -38,3 +38,18 @@ class Contact(Base):
         back_populates="contact",
         cascade="all, delete-orphan"
     )
+
+    @property
+    def current_pipeline_stage(self) -> str:
+        """
+        Compute current pipeline stage from most recent activity.
+
+        Returns:
+            Pipeline stage from the most recent activity, or "Lead" if no activities exist.
+        """
+        if not self.activities:
+            return "Lead"
+
+        # Get the most recent activity by activity_date
+        latest_activity = max(self.activities, key=lambda a: a.activity_date)
+        return latest_activity.pipeline_stage

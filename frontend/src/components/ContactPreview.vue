@@ -2,8 +2,39 @@
   <div class="bg-white shadow rounded-lg p-6">
     <div v-if="contact">
       <!-- Header with Actions -->
-      <div class="flex justify-between items-start mb-6">
-        <h2 class="text-xl font-bold text-gray-900">{{ contact.name }}</h2>
+      <div class="flex justify-between items-start mb-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h2 class="text-xl font-bold text-gray-900">{{ contact.name }}</h2>
+            <!-- Current Pipeline Stage Badge -->
+            <span
+              v-if="contact.current_pipeline_stage || contact.pipeline_stage"
+              :class="[
+                'px-3 py-1 rounded-full text-xs font-semibold',
+                getStageBadgeClass(contact.current_pipeline_stage || contact.pipeline_stage)
+              ]"
+            >
+              {{ contact.current_pipeline_stage || contact.pipeline_stage }}
+            </span>
+          </div>
+
+          <!-- Job Title and Company -->
+          <div v-if="contact.job_title || contact.company" class="text-sm text-gray-600">
+            <span v-if="contact.job_title">{{ contact.job_title }}</span>
+            <span v-if="contact.job_title && contact.company"> at </span>
+            <a
+              v-if="contact.company && contact.website"
+              :href="contact.website"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-600 hover:text-blue-800"
+            >
+              {{ contact.company }}
+            </a>
+            <span v-else-if="contact.company">{{ contact.company }}</span>
+          </div>
+        </div>
+
         <div class="flex gap-2">
           <button
             @click="$emit('edit', contact)"
@@ -50,7 +81,7 @@
 
       <!-- Tab Content -->
       <div v-show="activeTab === 'timeline'">
-        <ActivityTimeline :contact-id="contact.id" />
+        <ActivityTimeline :contact-id="contact.id" @stage-updated="handleStageUpdated" />
       </div>
 
       <div v-show="activeTab === 'contact-info'" class="space-y-4">
@@ -67,16 +98,6 @@
         <div v-if="contact.phone">
           <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
           <p class="text-base text-gray-900">{{ contact.phone }}</p>
-        </div>
-
-        <div v-if="contact.company">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
-          <p class="text-base text-gray-900">{{ contact.company }}</p>
-        </div>
-
-        <div v-if="contact.job_title">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-          <p class="text-base text-gray-900">{{ contact.job_title }}</p>
         </div>
 
         <div v-if="contact.website">
@@ -101,14 +122,7 @@
           <p class="text-base text-gray-900 whitespace-pre-wrap">{{ contact.notes }}</p>
         </div>
 
-        <!-- Pipeline Stage Selector -->
-        <div>
-          <StageSelector
-            v-model="currentStage"
-            :contact-id="contact.id"
-            @stage-updated="handleStageUpdated"
-          />
-        </div>
+        <!-- StageSelector removed - stage changes now happen via activities -->
 
         <div class="pt-4 border-t border-gray-200">
           <label class="block text-sm font-medium text-gray-700 mb-1">Created At</label>
@@ -134,7 +148,6 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import StageSelector from './StageSelector.vue'
 import ActivityTimeline from './ActivityTimeline.vue'
 
 const props = defineProps({
@@ -147,19 +160,36 @@ const props = defineProps({
 const emit = defineEmits(['edit', 'delete', 'stage-updated'])
 
 const activeTab = ref('timeline')
-const currentStage = ref(props.contact?.pipeline_stage || 'Lead')
 
 // Watch for contact changes
 watch(() => props.contact, (newContact) => {
   if (newContact) {
-    currentStage.value = newContact.pipeline_stage
     // Reset to timeline tab when contact changes
     activeTab.value = 'timeline'
   }
 }, { immediate: true })
 
-function handleStageUpdated(event) {
-  emit('stage-updated', event)
+function handleStageUpdated(data) {
+  // Forward the event to parent (ContactsView)
+  // The parent will update the contact object, which will reactively update this component
+  emit('stage-updated', data)
+}
+
+function getStageBadgeClass(stage) {
+  const stageColors = {
+    // Active stages
+    'Lead': 'bg-yellow-100 text-yellow-800',
+    'Qualified': 'bg-blue-100 text-blue-800',
+    'Proposal': 'bg-purple-100 text-purple-800',
+    'Client': 'bg-green-100 text-green-800',
+    // Passive stages
+    'Qualified Out': 'bg-gray-100 text-gray-800',
+    'Lost Proposal': 'bg-red-100 text-red-800',
+    'Work Completed': 'bg-teal-100 text-teal-800',
+    'Archived': 'bg-slate-100 text-slate-800'
+  }
+
+  return stageColors[stage] || 'bg-gray-100 text-gray-800'
 }
 
 function formatDate(dateString) {

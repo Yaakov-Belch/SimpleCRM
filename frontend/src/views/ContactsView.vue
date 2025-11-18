@@ -2,11 +2,11 @@
   <div class="min-h-screen bg-gray-50">
     <NavigationBar />
 
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="max-w-full mx-auto py-6 px-8">
       <div class="px-4 sm:px-0">
-        <div class="grid grid-cols-3 gap-6">
-          <!-- Contact List (Left - 2 columns) -->
-          <div class="col-span-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Contact List (Left - 1 column) -->
+          <div class="col-span-1">
             <div class="bg-white shadow rounded-lg">
               <!-- Header -->
               <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -17,6 +17,40 @@
                 >
                   New Contact
                 </router-link>
+              </div>
+
+              <!-- Active/Passive Tabs -->
+              <div class="px-6 pt-4 border-b border-gray-200">
+                <nav class="-mb-px flex space-x-8">
+                  <button
+                    @click="switchActivePassiveTab('Active')"
+                    :class="[
+                      'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm',
+                      activePassiveTab === 'Active'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ]"
+                  >
+                    Active
+                    <span v-if="activeCount > 0" class="ml-2 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                      {{ activeCount }}
+                    </span>
+                  </button>
+                  <button
+                    @click="switchActivePassiveTab('Passive')"
+                    :class="[
+                      'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm',
+                      activePassiveTab === 'Passive'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ]"
+                  >
+                    Passive
+                    <span v-if="passiveCount > 0" class="ml-2 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                      {{ passiveCount }}
+                    </span>
+                  </button>
+                </nav>
               </div>
 
               <!-- Search and Filter -->
@@ -37,11 +71,10 @@
                       @change="onFilterChange"
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="All">All Stages</option>
-                      <option value="Lead">Lead</option>
-                      <option value="Qualified">Qualified</option>
-                      <option value="Proposal">Proposal</option>
-                      <option value="Client">Client</option>
+                      <option value="All">All Stages{{ allStagesCount > 0 ? ` (${allStagesCount})` : '' }}</option>
+                      <option v-for="stage in currentStages" :key="stage" :value="stage">
+                        {{ stage }}{{ stageCounts[stage] > 0 ? ` (${stageCounts[stage]})` : '' }}
+                      </option>
                     </select>
                   </div>
                 </div>
@@ -86,8 +119,8 @@
                         {{ contact.company || '-' }}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm">
-                        <span :class="getStageClass(contact.pipeline_stage)">
-                          {{ contact.pipeline_stage }}
+                        <span :class="getStageClass(contact.current_pipeline_stage || contact.pipeline_stage)">
+                          {{ contact.current_pipeline_stage || contact.pipeline_stage }}
                         </span>
                       </td>
                     </tr>
@@ -159,10 +192,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useContacts } from '../composables/useContacts'
-import { deleteContact, ApiError } from '../services/api'
+import { deleteContact, apiGet, ApiError } from '../services/api'
 import NavigationBar from '../components/NavigationBar.vue'
 import ContactPreview from '../components/ContactPreview.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -174,10 +207,28 @@ const { contacts, selectedContact, isLoading, error, pagination, fetchContacts, 
 
 const searchQuery = ref(route.query.search || '')
 const stageFilter = ref(route.query.stage || 'All')
+const activePassiveTab = ref('Active')
 const showDeleteConfirm = ref(false)
 const contactToDelete = ref(null)
+const stageCounts = ref({})
+const activeCount = ref(0)
+const passiveCount = ref(0)
 
 let searchTimeout = null
+
+// Pipeline stage categories
+const activeStages = ['Lead', 'Qualified', 'Proposal', 'Client']
+const passiveStages = ['Qualified Out', 'Lost Proposal', 'Work Completed', 'Archived']
+
+// Computed current stages based on Active/Passive tab
+const currentStages = computed(() => {
+  return activePassiveTab.value === 'Active' ? activeStages : passiveStages
+})
+
+// Computed all stages count for current tab
+const allStagesCount = computed(() => {
+  return activePassiveTab.value === 'Active' ? activeCount.value : passiveCount.value
+})
 
 function debounceSearch(callback, delay = 300) {
   return (...args) => {
@@ -193,11 +244,21 @@ const debouncedFetch = debounceSearch(async () => {
 function onSearchInput() {
   updateQueryParams()
   debouncedFetch()
+  fetchFilterCounts()
 }
 
 function onFilterChange() {
   updateQueryParams()
   loadContacts()
+  fetchFilterCounts()
+}
+
+function switchActivePassiveTab(tab) {
+  activePassiveTab.value = tab
+  stageFilter.value = 'All'
+  updateQueryParams()
+  loadContacts()
+  fetchFilterCounts()
 }
 
 function updateQueryParams() {
@@ -211,13 +272,43 @@ function updateQueryParams() {
 
 async function loadContacts() {
   try {
+    // Build stage filter based on Active/Passive tab
+    let stageParam = undefined
+    if (stageFilter.value !== 'All') {
+      stageParam = stageFilter.value
+    } else {
+      // When "All" is selected, filter by all stages in current tab (Active or Passive)
+      stageParam = currentStages.value.join(',')
+    }
+
     await fetchContacts({
       page: pagination.value.page,
       search: searchQuery.value || undefined,
-      stage: stageFilter.value !== 'All' ? stageFilter.value : undefined
+      stage: stageParam
     })
   } catch (err) {
     console.error('Failed to load contacts:', err)
+  }
+}
+
+async function fetchFilterCounts() {
+  try {
+    const params = new URLSearchParams()
+    if (searchQuery.value) {
+      params.append('search', searchQuery.value)
+    }
+
+    const response = await apiGet(`/contacts/filter-counts${params.toString() ? '?' + params.toString() : ''}`)
+
+    if (response && response.stage_counts) {
+      stageCounts.value = response.stage_counts
+
+      // Calculate active and passive totals
+      activeCount.value = activeStages.reduce((sum, stage) => sum + (response.stage_counts[stage] || 0), 0)
+      passiveCount.value = passiveStages.reduce((sum, stage) => sum + (response.stage_counts[stage] || 0), 0)
+    }
+  } catch (err) {
+    console.error('Failed to fetch filter counts:', err)
   }
 }
 
@@ -268,6 +359,9 @@ async function onDeleteConfirm() {
 
     showDeleteConfirm.value = false
     contactToDelete.value = null
+
+    // Refresh counts
+    fetchFilterCounts()
   } catch (err) {
     console.error('Failed to delete contact:', err)
     alert(err instanceof ApiError ? err.message : 'Failed to delete contact. Please try again.')
@@ -281,24 +375,42 @@ function onDeleteCancel() {
 
 function onStageUpdated({ contactId, stage }) {
   // Update the contact in the local list
-  const contact = contacts.value.find(c => c.id === contactId)
-  if (contact) {
-    contact.pipeline_stage = stage
+  const contactIndex = contacts.value.findIndex(c => c.id === contactId)
+  if (contactIndex !== -1) {
+    // Create a new object to ensure Vue's reactivity detects the change
+    contacts.value[contactIndex] = {
+      ...contacts.value[contactIndex],
+      current_pipeline_stage: stage,
+      pipeline_stage: stage
+    }
   }
 
   // Update selected contact if it's the one that changed
   if (selectedContact.value?.id === contactId) {
-    selectedContact.value.pipeline_stage = stage
+    selectedContact.value = {
+      ...selectedContact.value,
+      current_pipeline_stage: stage,
+      pipeline_stage: stage
+    }
   }
+
+  // Refresh counts
+  fetchFilterCounts()
 }
 
 function getStageClass(stage) {
   const baseClass = 'px-2 py-1 text-xs font-semibold rounded-full'
   const stages = {
-    Lead: 'bg-yellow-100 text-yellow-800',
-    Qualified: 'bg-blue-100 text-blue-800',
-    Proposal: 'bg-purple-100 text-purple-800',
-    Client: 'bg-green-100 text-green-800'
+    // Active stages
+    'Lead': 'bg-yellow-100 text-yellow-800',
+    'Qualified': 'bg-blue-100 text-blue-800',
+    'Proposal': 'bg-purple-100 text-purple-800',
+    'Client': 'bg-green-100 text-green-800',
+    // Passive stages
+    'Qualified Out': 'bg-gray-100 text-gray-800',
+    'Lost Proposal': 'bg-red-100 text-red-800',
+    'Work Completed': 'bg-teal-100 text-teal-800',
+    'Archived': 'bg-slate-100 text-slate-800'
   }
   return `${baseClass} ${stages[stage] || 'bg-gray-100 text-gray-800'}`
 }
@@ -310,5 +422,6 @@ onMounted(async () => {
   }
 
   await loadContacts()
+  await fetchFilterCounts()
 })
 </script>

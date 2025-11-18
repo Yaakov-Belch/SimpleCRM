@@ -7,6 +7,7 @@ import * as api from '../../services/api'
 
 vi.mock('../../services/api', () => ({
   getActivitiesForContact: vi.fn(),
+  createActivity: vi.fn(),
   deleteActivity: vi.fn(),
   ApiError: class ApiError extends Error {
     constructor(message, status, data) {
@@ -163,10 +164,22 @@ describe('ActivityTimeline', () => {
     expect(subjects[2]).toBe('Proposal sent')
   })
 
-  it('opens activity form when Add Activity button is clicked', async () => {
+  it('creates activity immediately and opens form when "New Activity" button is clicked', async () => {
     api.getActivitiesForContact.mockResolvedValue({
       activities: []
     })
+
+    const mockNewActivity = {
+      id: 1,
+      type: 'Note',
+      subject: '',
+      notes: '',
+      activity_date: '2024-01-15T10:30:00',
+      pipeline_stage: 'Lead',
+      attachments: []
+    }
+
+    api.createActivity.mockResolvedValue(mockNewActivity)
 
     const wrapper = mount(ActivityTimeline, {
       props: {
@@ -179,6 +192,10 @@ describe('ActivityTimeline', () => {
     const addButton = wrapper.find('button')
     await addButton.trigger('click')
 
+    await flushPromises()
+
+    // Should have created activity and opened form
+    expect(api.createActivity).toHaveBeenCalled()
     expect(wrapper.findComponent(ActivityForm).exists()).toBe(true)
   })
 
@@ -233,9 +250,20 @@ describe('ActivityTimeline', () => {
     expect(wrapper.vm.activities.length).toBe(2)
   })
 
-  it('adds new activity to timeline when saved', async () => {
+  it('updates activity in timeline when saved', async () => {
+    const initialActivities = [
+      {
+        id: 1,
+        type: 'Note',
+        subject: 'Original subject',
+        notes: 'Original notes',
+        activity_date: '2024-01-15T10:30:00',
+        attachments: []
+      }
+    ]
+
     api.getActivitiesForContact.mockResolvedValue({
-      activities: []
+      activities: initialActivities
     })
 
     const wrapper = mount(ActivityTimeline, {
@@ -246,27 +274,22 @@ describe('ActivityTimeline', () => {
 
     await flushPromises()
 
-    // Open form
-    const addButton = wrapper.find('button')
-    await addButton.trigger('click')
+    // Open form to edit existing activity
+    await wrapper.vm.handleEdit(initialActivities[0])
 
-    // Simulate activity saved
-    const newActivity = {
-      id: 4,
-      type: 'Note',
-      subject: 'New note',
-      notes: 'Content',
-      activity_date: '2024-01-16T12:00:00',
-      attachments: []
+    // Simulate activity updated
+    const updatedActivity = {
+      ...initialActivities[0],
+      subject: 'Updated subject',
+      notes: 'Updated notes'
     }
 
-    const form = wrapper.findComponent(ActivityForm)
-    await form.vm.$emit('saved', newActivity)
+    await wrapper.vm.handleActivitySaved(updatedActivity)
 
     await wrapper.vm.$nextTick()
 
     expect(wrapper.vm.activities.length).toBe(1)
-    expect(wrapper.vm.activities[0]).toEqual(newActivity)
+    expect(wrapper.vm.activities[0].subject).toBe('Updated subject')
   })
 
   // CRITICAL TEST: Prop reactivity (prevents regression of the bug)
@@ -384,5 +407,131 @@ describe('ActivityTimeline', () => {
     expect(wrapper.vm.activities[0].subject).toBe('Contact 2 activity')
     expect(wrapper.text()).toContain('Contact 2 activity')
     expect(wrapper.text()).not.toContain('Contact 1 activity')
+  })
+
+  // Task Group 4 Tests
+
+  it('displays "New Activity" button text instead of "Add Activity"', async () => {
+    api.getActivitiesForContact.mockResolvedValue({
+      activities: []
+    })
+
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    const addButton = wrapper.find('button')
+    expect(addButton.text()).toBe('New Activity')
+  })
+
+  it('creates activity immediately when "New Activity" button is clicked', async () => {
+    api.getActivitiesForContact.mockResolvedValue({
+      activities: []
+    })
+
+    const mockNewActivity = {
+      id: 1,
+      type: 'Note',
+      subject: '',
+      notes: '',
+      activity_date: '2024-01-15T10:30:00',
+      pipeline_stage: 'Lead',
+      attachments: []
+    }
+
+    api.createActivity.mockResolvedValue(mockNewActivity)
+
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    const newActivityButton = wrapper.find('button')
+    await newActivityButton.trigger('click')
+
+    await flushPromises()
+
+    // Should have called API to create activity immediately
+    expect(api.createActivity).toHaveBeenCalledWith(1, expect.objectContaining({
+      type: 'Note'
+    }))
+
+    // Activity should be added to timeline
+    expect(wrapper.vm.activities.length).toBe(1)
+  })
+
+  it('displays newly created empty activity in timeline', async () => {
+    api.getActivitiesForContact.mockResolvedValue({
+      activities: []
+    })
+
+    const mockNewActivity = {
+      id: 1,
+      type: 'Note',
+      subject: '',
+      notes: '',
+      activity_date: '2024-01-15T10:30:00',
+      pipeline_stage: 'Lead',
+      attachments: []
+    }
+
+    api.createActivity.mockResolvedValue(mockNewActivity)
+
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    // Initially no activities
+    expect(wrapper.vm.activities.length).toBe(0)
+
+    const newActivityButton = wrapper.find('button')
+    await newActivityButton.trigger('click')
+
+    await flushPromises()
+
+    // Should now have one activity
+    expect(wrapper.vm.activities.length).toBe(1)
+    expect(wrapper.vm.activities[0]).toEqual(mockNewActivity)
+  })
+
+  it('shows type filter dropdown with count badges', async () => {
+    const activitiesWithCounts = [
+      { id: 1, type: 'Call', subject: 'Call 1', activity_date: '2024-01-15T10:30:00' },
+      { id: 2, type: 'Call', subject: 'Call 2', activity_date: '2024-01-14T10:30:00' },
+      { id: 3, type: 'Meeting', subject: 'Meeting 1', activity_date: '2024-01-13T10:30:00' },
+      { id: 4, type: 'Note', subject: 'Note 1', activity_date: '2024-01-12T10:30:00' }
+    ]
+
+    api.getActivitiesForContact.mockResolvedValue({
+      activities: activitiesWithCounts
+    })
+
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    const typeSelect = wrapper.find('select')
+    const optionsText = typeSelect.html()
+
+    // Should show counts in dropdown options
+    expect(optionsText).toContain('All')
+    expect(optionsText).toContain('Call')
+    expect(optionsText).toContain('Meeting')
+    expect(optionsText).toContain('Note')
   })
 })

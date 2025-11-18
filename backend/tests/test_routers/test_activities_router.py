@@ -15,12 +15,17 @@ from app.models import Activity, Contact, Session, User
 @pytest.fixture
 def db_session():
     """Create a test database session."""
-    engine = create_engine("sqlite:///:memory:")
+    # Use file::memory:?cache=shared for in-memory database shared across threads
+    engine = create_engine(
+        "sqlite:///file::memory:?cache=shared&uri=true",
+        connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
     yield session
     session.close()
+    engine.dispose()
 
 
 @pytest.fixture

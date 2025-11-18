@@ -1,7 +1,7 @@
 """Contact schemas for request/response validation."""
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
 
@@ -46,6 +46,7 @@ class ContactResponseSchema(BaseModel):
     website: Optional[str]
     notes: Optional[str]
     pipeline_stage: str
+    current_pipeline_stage: str  # Computed from latest activity
     user_id: int
     created_at: datetime
     updated_at: datetime
@@ -62,10 +63,16 @@ class ContactListResponseSchema(BaseModel):
 
 
 class PipelineStatsResponseSchema(BaseModel):
-    """Schema for pipeline statistics response."""
+    """Schema for pipeline statistics response with active/passive separation."""
 
-    lead_count: int = Field(..., ge=0, description="Number of contacts in Lead stage")
-    qualified_count: int = Field(..., ge=0, description="Number of contacts in Qualified stage")
-    proposal_count: int = Field(..., ge=0, description="Number of contacts in Proposal stage")
-    client_count: int = Field(..., ge=0, description="Number of contacts in Client stage")
-    total_count: int = Field(..., ge=0, description="Total number of contacts")
+    active_stages: Dict[str, int] = Field(..., description="Counts for active stages")
+    passive_stages: Dict[str, int] = Field(..., description="Counts for passive stages")
+    active_count: int = Field(..., ge=0, description="Total count of contacts in active stages")
+    passive_count: int = Field(..., ge=0, description="Total count of contacts in passive stages")
+
+
+class FilterCountsResponseSchema(BaseModel):
+    """Schema for filter counts response."""
+
+    stage_counts: Dict[str, int] = Field(..., description="Counts by pipeline stage")
+    activity_type_counts: Dict[str, int] = Field(..., description="Counts by activity type")

@@ -1,5 +1,6 @@
 """Activity service for activity-related operations."""
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import func, or_
@@ -41,9 +42,35 @@ class ActivityService:
         if not contact:
             return None
 
+        # Prepare activity data
+        activity_dict = activity_data.model_dump()
+
+        # Set default values if not provided
+        if not activity_dict.get("type"):
+            activity_dict["type"] = "Note"
+        if not activity_dict.get("activity_date"):
+            activity_dict["activity_date"] = datetime.utcnow()
+        if activity_dict.get("subject") is None:
+            activity_dict["subject"] = ""
+
+        # Handle pipeline_stage inheritance
+        if not activity_dict.get("pipeline_stage"):
+            # Query contact's most recent activity to inherit pipeline_stage
+            latest_activity = db.query(Activity).filter(
+                Activity.contact_id == contact_id
+            ).order_by(
+                Activity.activity_date.desc()
+            ).first()
+
+            if latest_activity:
+                activity_dict["pipeline_stage"] = latest_activity.pipeline_stage
+            else:
+                # No previous activities, default to "Lead"
+                activity_dict["pipeline_stage"] = "Lead"
+
         activity = Activity(
             contact_id=contact_id,
-            **activity_data.model_dump()
+            **activity_dict
         )
 
         db.add(activity)

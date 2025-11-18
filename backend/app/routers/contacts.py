@@ -13,6 +13,7 @@ from app.schemas import (
     ContactListResponseSchema,
     ContactResponseSchema,
     ContactUpdateSchema,
+    FilterCountsResponseSchema,
     PipelineStatsResponseSchema,
 )
 from app.services.contact_service import ContactService
@@ -82,17 +83,30 @@ def create_contact(
     summary="Get pipeline stage statistics",
     description="""
     Retrieve contact counts grouped by pipeline stage for the authenticated user.
+    Returns separate counts for active and passive stages.
 
     **Authentication:** Required (Bearer token in Authorization header)
+
+    **Query Parameters:**
+    - `search` (optional): Search term to filter contacts (case-insensitive)
 
     **Success Response (200):**
     ```json
     {
-      "lead_count": 10,
-      "qualified_count": 5,
-      "proposal_count": 3,
-      "client_count": 8,
-      "total_count": 26
+      "active_stages": {
+        "Lead": 10,
+        "Qualified": 5,
+        "Proposal": 3,
+        "Client": 8
+      },
+      "passive_stages": {
+        "Qualified Out": 2,
+        "Lost Proposal": 1,
+        "Work Completed": 4,
+        "Archived": 3
+      },
+      "active_count": 26,
+      "passive_count": 10
     }
     ```
 
@@ -101,12 +115,58 @@ def create_contact(
     """
 )
 def get_pipeline_stats(
+    search: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
     """Get pipeline stage statistics for the current user."""
-    stats = ContactService.get_pipeline_stats(db, current_user.id)
+    stats = ContactService.get_pipeline_stats(db, current_user.id, search)
     return PipelineStatsResponseSchema(**stats)
+
+
+@router.get(
+    "/filter-counts",
+    response_model=FilterCountsResponseSchema,
+    summary="Get filter counts for contacts and activities",
+    description="""
+    Retrieve counts for pipeline stages and activity types.
+    Counts respect the optional search query parameter.
+
+    **Authentication:** Required (Bearer token in Authorization header)
+
+    **Query Parameters:**
+    - `search` (optional): Search term to filter contacts (case-insensitive)
+
+    **Success Response (200):**
+    ```json
+    {
+      "stage_counts": {
+        "Lead": 15,
+        "Qualified": 8,
+        "Proposal": 5,
+        "Client": 12
+      },
+      "activity_type_counts": {
+        "Note": 42,
+        "Call": 18,
+        "Meeting": 12,
+        "Email": 25
+      }
+    }
+    ```
+
+    **Error Responses:**
+    - `401 Unauthorized`: Missing, invalid, or expired session token
+    """
+)
+def get_filter_counts(
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db)
+):
+    """Get filter counts for contacts and activities."""
+    counts = ContactService.get_filter_counts(db, current_user.id, search)
+    return FilterCountsResponseSchema(**counts)
 
 
 @router.get(

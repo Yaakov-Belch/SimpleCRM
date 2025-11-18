@@ -43,7 +43,6 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Subject
-            <span class="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -70,6 +69,30 @@
             :class="{ 'border-red-500': errors.activity_date }"
           />
           <p v-if="errors.activity_date" class="mt-1 text-sm text-red-600">{{ errors.activity_date }}</p>
+        </div>
+
+        <!-- Pipeline Stage -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Pipeline Stage
+          </label>
+          <select
+            v-model="formData.pipeline_stage"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <optgroup label="Active Stages">
+              <option value="Lead">Lead</option>
+              <option value="Qualified">Qualified</option>
+              <option value="Proposal">Proposal</option>
+              <option value="Client">Client</option>
+            </optgroup>
+            <optgroup label="Passive Stages">
+              <option value="Qualified Out">Qualified Out</option>
+              <option value="Lost Proposal">Lost Proposal</option>
+              <option value="Work Completed">Work Completed</option>
+              <option value="Archived">Archived</option>
+            </optgroup>
+          </select>
         </div>
 
         <!-- Notes (Markdown Editor) -->
@@ -145,7 +168,7 @@
             :disabled="isSubmitting"
             class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {{ isSubmitting ? 'Saving...' : (activity ? 'Update Activity' : 'Create Activity') }}
+            {{ isSubmitting ? 'Saving...' : 'Update Activity' }}
           </button>
           <button
             type="button"
@@ -192,13 +215,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['saved', 'cancelled', 'deleted'])
+const emit = defineEmits(['saved', 'cancelled', 'deleted', 'stage-updated'])
 
 const formData = reactive({
-  type: '',
+  type: 'Note',
   subject: '',
   activity_date: '',
-  notes: ''
+  notes: '',
+  pipeline_stage: 'Lead'
 })
 
 const errors = ref({})
@@ -218,11 +242,7 @@ function validateType() {
 }
 
 function validateSubject() {
-  if (!formData.subject) {
-    errors.value.subject = 'Subject is required'
-    return false
-  }
-  if (formData.subject.length > 255) {
+  if (formData.subject && formData.subject.length > 255) {
     errors.value.subject = 'Subject must be 255 characters or less'
     return false
   }
@@ -256,10 +276,16 @@ async function handleSubmit() {
   try {
     const activityData = {
       type: formData.type,
-      subject: formData.subject,
+      subject: formData.subject || undefined,
       activity_date: formData.activity_date,
-      notes: formData.notes || undefined
+      notes: formData.notes || undefined,
+      pipeline_stage: formData.pipeline_stage
     }
+
+    // Track if the stage changed
+    const stageChanged = props.activity
+      ? props.activity.pipeline_stage !== formData.pipeline_stage
+      : true // New activities always have a stage
 
     let savedActivity
     if (props.activity) {
@@ -269,6 +295,14 @@ async function handleSubmit() {
     }
 
     emit('saved', savedActivity)
+
+    // Emit stage-updated event if the stage changed
+    if (stageChanged && savedActivity.pipeline_stage) {
+      emit('stage-updated', {
+        contactId: props.contactId,
+        stage: savedActivity.pipeline_stage
+      })
+    }
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.data?.error?.field) {
@@ -289,7 +323,7 @@ async function handleFileSelect(event) {
   if (!file) return
 
   if (!props.activity) {
-    alert('Please save the activity first before adding attachments.')
+    uploadError.value = 'Activity must be saved before adding attachments'
     return
   }
 
@@ -381,6 +415,7 @@ onMounted(() => {
     formData.subject = props.activity.subject
     formData.activity_date = formatDateTimeLocal(props.activity.activity_date)
     formData.notes = props.activity.notes || ''
+    formData.pipeline_stage = props.activity.pipeline_stage || 'Lead'
   } else {
     // Default to current date/time for new activities
     formData.activity_date = formatDateTimeLocal(new Date().toISOString())

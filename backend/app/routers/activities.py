@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
@@ -79,14 +79,15 @@ def list_contact_activities(
     **Path Parameters:**
     - `contact_id` (required): Contact ID
 
-    **Request Body:**
-    - `type` (required): Activity type (Call, Meeting, Email, Note)
-    - `subject` (required): Activity subject (max 255 characters)
+    **Request Body (all fields optional with defaults):**
+    - `type` (optional): Activity type (Call, Meeting, Email, Note). Default: "Note"
+    - `subject` (optional): Activity subject (max 255 characters). Default: ""
     - `notes` (optional): Activity notes in markdown format
-    - `activity_date` (required): Date and time of the activity
+    - `activity_date` (optional): Date and time of the activity. Default: current datetime
+    - `pipeline_stage` (optional): Pipeline stage. Default: inherited from latest activity or "Lead"
 
     **Success Response (201):**
-    Returns the created activity object.
+    Returns the created activity object with ID and pipeline_stage.
 
     **Error Responses:**
     - `400 Bad Request`: Invalid input data
@@ -96,11 +97,11 @@ def list_contact_activities(
 )
 def create_activity(
     contact_id: int,
-    activity_data: ActivityCreateSchema,
+    activity_data: ActivityCreateSchema = Body(default=ActivityCreateSchema()),
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
-    """Create a new activity for a contact."""
+    """Create a new activity for a contact with minimal required data."""
     activity = ActivityService.create_activity(
         db, contact_id, current_user.id, activity_data
     )
@@ -197,7 +198,7 @@ def get_activity(
     - `activity_id` (required): Activity ID
 
     **Request Body (all fields optional):**
-    - `type`, `subject`, `notes`, `activity_date`
+    - `type`, `subject`, `notes`, `activity_date`, `pipeline_stage`
 
     **Success Response (200):**
     Returns the updated activity object.

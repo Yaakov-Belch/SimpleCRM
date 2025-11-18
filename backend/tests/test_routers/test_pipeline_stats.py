@@ -76,15 +76,19 @@ def test_get_pipeline_stats_empty(client, auth_headers):
 
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["lead_count"] == 0
-    assert json_data["qualified_count"] == 0
-    assert json_data["proposal_count"] == 0
-    assert json_data["client_count"] == 0
-    assert json_data["total_count"] == 0
+    assert json_data["active_stages"]["Lead"] == 0
+    assert json_data["active_stages"]["Qualified"] == 0
+    assert json_data["active_stages"]["Proposal"] == 0
+    assert json_data["active_stages"]["Client"] == 0
+    assert json_data["active_count"] == 0
+    assert json_data["passive_count"] == 0
 
 
 def test_get_pipeline_stats_with_contacts(client, db_session, test_user, auth_headers):
     """Test getting pipeline stats with various contacts."""
+    from datetime import datetime
+    from app.models import Activity
+
     # Create contacts in different stages
     contacts = [
         Contact(name="Lead 1", email="lead1@example.com", pipeline_stage="Lead", user_id=test_user.id),
@@ -102,15 +106,28 @@ def test_get_pipeline_stats_with_contacts(client, db_session, test_user, auth_he
         db_session.add(contact)
     db_session.commit()
 
+    # Create activities to set the pipeline stages (contacts derive stage from latest activity)
+    for contact in contacts:
+        activity = Activity(
+            contact_id=contact.id,
+            type="Note",
+            subject=f"Activity for {contact.name}",
+            pipeline_stage=contact.pipeline_stage,
+            activity_date=datetime.utcnow()
+        )
+        db_session.add(activity)
+    db_session.commit()
+
     response = client.get("/api/contacts/pipeline-stats", headers=auth_headers)
 
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["lead_count"] == 3
-    assert json_data["qualified_count"] == 2
-    assert json_data["proposal_count"] == 1
-    assert json_data["client_count"] == 4
-    assert json_data["total_count"] == 10
+    assert json_data["active_stages"]["Lead"] == 3
+    assert json_data["active_stages"]["Qualified"] == 2
+    assert json_data["active_stages"]["Proposal"] == 1
+    assert json_data["active_stages"]["Client"] == 4
+    assert json_data["active_count"] == 10
+    assert json_data["passive_count"] == 0
 
 
 def test_update_contact_pipeline_stage(client, db_session, test_user, auth_headers):
@@ -183,6 +200,9 @@ def test_create_contact_defaults_to_lead(client, auth_headers):
 
 def test_pipeline_stats_user_isolation(client, db_session, test_user, auth_headers):
     """Test that pipeline stats only include current user's contacts."""
+    from datetime import datetime
+    from app.models import Activity
+
     # Create another user
     other_user = User(
         email="other@example.com",
@@ -210,13 +230,37 @@ def test_pipeline_stats_user_isolation(client, db_session, test_user, auth_heade
         db_session.add(contact)
     db_session.commit()
 
+    # Create activities to set the pipeline stages for test_user's contacts
+    for contact in test_contacts:
+        activity = Activity(
+            contact_id=contact.id,
+            type="Note",
+            subject=f"Activity for {contact.name}",
+            pipeline_stage=contact.pipeline_stage,
+            activity_date=datetime.utcnow()
+        )
+        db_session.add(activity)
+
+    # Create activities for other_user's contacts too
+    for contact in other_contacts:
+        activity = Activity(
+            contact_id=contact.id,
+            type="Note",
+            subject=f"Activity for {contact.name}",
+            pipeline_stage=contact.pipeline_stage,
+            activity_date=datetime.utcnow()
+        )
+        db_session.add(activity)
+    db_session.commit()
+
     # Get stats for test_user
     response = client.get("/api/contacts/pipeline-stats", headers=auth_headers)
 
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["lead_count"] == 1
-    assert json_data["qualified_count"] == 0
-    assert json_data["proposal_count"] == 0
-    assert json_data["client_count"] == 1
-    assert json_data["total_count"] == 2  # Only test_user's contacts
+    assert json_data["active_stages"]["Lead"] == 1
+    assert json_data["active_stages"]["Qualified"] == 0
+    assert json_data["active_stages"]["Proposal"] == 0
+    assert json_data["active_stages"]["Client"] == 1
+    assert json_data["active_count"] == 2  # Only test_user's contacts
+    assert json_data["passive_count"] == 0

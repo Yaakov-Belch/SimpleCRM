@@ -5,12 +5,17 @@ from typing import Optional, Tuple
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
+from app.models.activity import Activity
 from app.models.contact import Contact
 from app.schemas.contact import ContactCreateSchema, ContactUpdateSchema
 
 
 class ContactService:
     """Service for contact-related operations."""
+
+    # Define active and passive stage lists
+    ACTIVE_STAGES = ["Lead", "Qualified", "Proposal", "Client"]
+    PASSIVE_STAGES = ["Qualified Out", "Lost Proposal", "Work Completed", "Archived"]
 
     @staticmethod
     def create_contact(
@@ -62,7 +67,10 @@ class ContactService:
         Returns:
             Contact object if found and owned by user, None otherwise
         """
-        return db.query(Contact).filter(
+        from sqlalchemy.orm import joinedload
+        return db.query(Contact).options(
+            joinedload(Contact.activities)
+        ).filter(
             Contact.id == contact_id,
             Contact.user_id == user_id
         ).first()
@@ -90,11 +98,16 @@ class ContactService:
         Returns:
             Tuple of (list of contacts, total count)
         """
+        from sqlalchemy.orm import joinedload
+        from sqlalchemy import select
+
         # Enforce max limit
         limit = min(limit, 100)
 
-        # Base query with user filter
-        query = db.query(Contact).filter(Contact.user_id == user_id)
+        # Base query with user filter and eager load activities for current_pipeline_stage
+        query = db.query(Contact).options(
+            joinedload(Contact.activities)
+        ).filter(Contact.user_id == user_id)
 
         # Apply search filter (case-insensitive OR search)
         if search:
@@ -107,16 +120,27 @@ class ContactService:
                 )
             )
 
-        # Apply pipeline stage filter
+        # For pipeline stage filtering, we need to filter in Python since current_pipeline_stage
+        # is computed from activities. Get all contacts first, then filter.
+        # This is acceptable for small datasets; for large datasets, we'd need a different approach.
+
+        # Get all matching contacts (before stage filter)
+        all_contacts = query.order_by(Contact.created_at.desc()).all()
+
+        # Apply pipeline stage filter in Python
         if stage and stage != "All":
-            query = query.filter(Contact.pipeline_stage == stage)
+            # Support comma-separated stage values for multi-stage filtering
+            stages = [s.strip() for s in stage.split(',')]
+            filtered_contacts = [c for c in all_contacts if c.current_pipeline_stage in stages]
+        else:
+            filtered_contacts = all_contacts
 
-        # Get total count
-        total = query.count()
+        # Get total count after stage filter
+        total = len(filtered_contacts)
 
-        # Apply pagination
+        # Apply pagination to filtered results
         offset = (page - 1) * limit
-        contacts = query.order_by(Contact.created_at.desc()).offset(offset).limit(limit).all()
+        contacts = filtered_contacts[offset:offset + limit]
 
         return contacts, total
 
@@ -185,46 +209,125 @@ class ContactService:
         return True
 
     @staticmethod
-    def get_pipeline_stats(db: DBSession, user_id: int) -> dict:
+    def get_pipeline_stats(
+        db: DBSession,
+        user_id: int,
+        search: Optional[str] = None
+    ) -> dict:
         """
-        Get pipeline stage statistics for a user.
+        Get pipeline stage statistics for a user with active/passive separation.
 
         Args:
             db: Database session
             user_id: User ID
+            search: Optional search query to filter contacts
 
         Returns:
-            Dictionary with counts per stage and total count
+            Dictionary with active_stages, passive_stages, active_count, passive_count
         """
-        # Query to get counts grouped by pipeline_stage
-        stage_counts = (
-            db.query(Contact.pipeline_stage, func.count(Contact.id))
-            .filter(Contact.user_id == user_id)
-            .group_by(Contact.pipeline_stage)
-            .all()
-        )
+        # Get all contacts for the user with optional search filter
+        contacts = db.query(Contact).filter(Contact.user_id == user_id)
 
-        # Initialize all stages with 0 counts
-        stats = {
-            "lead_count": 0,
-            "qualified_count": 0,
-            "proposal_count": 0,
-            "client_count": 0,
-            "total_count": 0
+        # Apply search filter if provided
+        if search:
+            search_term = f"%{search.lower()}%"
+            contacts = contacts.filter(
+                or_(
+                    func.lower(Contact.name).like(search_term),
+                    func.lower(Contact.email).like(search_term),
+                    func.lower(Contact.company).like(search_term)
+                )
+            )
+
+        contacts = contacts.all()
+
+        # Initialize stage counts
+        active_stages = {stage: 0 for stage in ContactService.ACTIVE_STAGES}
+        passive_stages = {stage: 0 for stage in ContactService.PASSIVE_STAGES}
+
+        # Count contacts by their current pipeline stage
+        for contact in contacts:
+            current_stage = contact.current_pipeline_stage
+            if current_stage in active_stages:
+                active_stages[current_stage] += 1
+            elif current_stage in passive_stages:
+                passive_stages[current_stage] += 1
+
+        # Calculate totals
+        active_count = sum(active_stages.values())
+        passive_count = sum(passive_stages.values())
+
+        return {
+            "active_stages": active_stages,
+            "passive_stages": passive_stages,
+            "active_count": active_count,
+            "passive_count": passive_count
         }
 
-        # Map stage names to count keys
-        stage_mapping = {
-            "Lead": "lead_count",
-            "Qualified": "qualified_count",
-            "Proposal": "proposal_count",
-            "Client": "client_count"
+    @staticmethod
+    def get_filter_counts(
+        db: DBSession,
+        user_id: int,
+        search: Optional[str] = None
+    ) -> dict:
+        """
+        Get filter counts for contacts and activities.
+
+        Args:
+            db: Database session
+            user_id: User ID
+            search: Optional search query to filter contacts
+
+        Returns:
+            Dictionary with stage_counts and activity_type_counts
+        """
+        # Get all contacts for the user with optional search filter
+        contacts_query = db.query(Contact).filter(Contact.user_id == user_id)
+
+        # Apply search filter if provided
+        if search:
+            search_term = f"%{search.lower()}%"
+            contacts_query = contacts_query.filter(
+                or_(
+                    func.lower(Contact.name).like(search_term),
+                    func.lower(Contact.email).like(search_term),
+                    func.lower(Contact.company).like(search_term)
+                )
+            )
+
+        contacts = contacts_query.all()
+
+        # Initialize stage counts with all possible stages
+        all_stages = ContactService.ACTIVE_STAGES + ContactService.PASSIVE_STAGES
+        stage_counts = {stage: 0 for stage in all_stages}
+
+        # Get contact IDs for activity filtering
+        contact_ids = [contact.id for contact in contacts]
+
+        # Count contacts by their current pipeline stage
+        for contact in contacts:
+            current_stage = contact.current_pipeline_stage
+            if current_stage in stage_counts:
+                stage_counts[current_stage] += 1
+
+        # Get activity type counts for the filtered contacts
+        activity_type_counts = {}
+        if contact_ids:
+            activity_counts = (
+                db.query(Activity.type, func.count(Activity.id))
+                .filter(Activity.contact_id.in_(contact_ids))
+                .group_by(Activity.type)
+                .all()
+            )
+            activity_type_counts = {activity_type: count for activity_type, count in activity_counts}
+        else:
+            # If no contacts match, return empty activity counts
+            activity_type_counts = {"Call": 0, "Meeting": 0, "Email": 0, "Note": 0}
+
+        # Remove stages with zero counts for cleaner response
+        stage_counts = {stage: count for stage, count in stage_counts.items() if count > 0}
+
+        return {
+            "stage_counts": stage_counts,
+            "activity_type_counts": activity_type_counts
         }
-
-        # Populate counts from query results
-        for stage, count in stage_counts:
-            if stage in stage_mapping:
-                stats[stage_mapping[stage]] = count
-                stats["total_count"] += count
-
-        return stats

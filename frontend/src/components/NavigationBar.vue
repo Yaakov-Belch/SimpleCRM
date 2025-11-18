@@ -7,15 +7,6 @@
         </div>
         <div v-if="isAuthenticated" class="flex items-center gap-4">
           <router-link
-            to="/dashboard"
-            :class="[
-              'hover:text-blue-200 transition',
-              $route.path === '/dashboard' ? 'font-semibold underline' : ''
-            ]"
-          >
-            Dashboard
-          </router-link>
-          <router-link
             to="/contacts"
             :class="[
               'hover:text-blue-200 transition',

@@ -25,9 +25,15 @@ class Activity(Base):
         nullable=False,
         index=True
     )
-    subject = Column(String(255), nullable=False)
+    subject = Column(String(255), nullable=True, default="")
     notes = Column(Text, nullable=True)
     activity_date = Column(DateTime, nullable=False, index=True)
+    pipeline_stage = Column(
+        String(50),
+        nullable=False,
+        default="Lead",
+        index=True
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
         DateTime,

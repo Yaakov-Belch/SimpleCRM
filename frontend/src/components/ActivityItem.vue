@@ -2,7 +2,7 @@
   <div class="activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
     <!-- Header -->
     <div class="flex justify-between items-start mb-3">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
         <!-- Type Badge -->
         <span
           :class="[
@@ -13,8 +13,19 @@
           {{ activity.type }}
         </span>
 
+        <!-- Pipeline Stage Badge (only when stage changes) -->
+        <span
+          v-if="showPipelineStageBadge"
+          :class="[
+            'px-3 py-1 rounded-full text-xs font-semibold',
+            stageBadgeClass
+          ]"
+        >
+          {{ activity.pipeline_stage }}
+        </span>
+
         <!-- Subject -->
-        <h3 class="text-lg font-bold text-gray-900">{{ activity.subject }}</h3>
+        <h3 class="text-lg font-bold text-gray-900">{{ activity.subject || '(No subject)' }}</h3>
       </div>
 
       <!-- Action Buttons (visible on hover) -->
@@ -97,6 +108,10 @@ const props = defineProps({
   activity: {
     type: Object,
     required: true
+  },
+  previousActivity: {
+    type: Object,
+    default: null
   }
 })
 
@@ -120,6 +135,32 @@ const typeBadgeClass = computed(() => {
   }
 
   return typeColors[props.activity.type] || 'bg-gray-100 text-gray-800'
+})
+
+// Show pipeline stage badge only when it differs from previous activity
+const showPipelineStageBadge = computed(() => {
+  if (!props.activity.pipeline_stage) return false
+  if (!props.previousActivity) return true
+
+  return props.activity.pipeline_stage !== props.previousActivity.pipeline_stage
+})
+
+// Stage badge styling
+const stageBadgeClass = computed(() => {
+  const stageColors = {
+    // Active stages
+    'Lead': 'bg-yellow-100 text-yellow-800',
+    'Qualified': 'bg-blue-100 text-blue-800',
+    'Proposal': 'bg-purple-100 text-purple-800',
+    'Client': 'bg-green-100 text-green-800',
+    // Passive stages
+    'Qualified Out': 'bg-gray-100 text-gray-800',
+    'Lost Proposal': 'bg-red-100 text-red-800',
+    'Work Completed': 'bg-teal-100 text-teal-800',
+    'Archived': 'bg-slate-100 text-slate-800'
+  }
+
+  return stageColors[props.activity.pipeline_stage] || 'bg-gray-100 text-gray-800'
 })
 
 // Sanitize markdown notes

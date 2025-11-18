@@ -11,7 +11,7 @@ import ContactEditView from '../views/ContactEditView.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/contacts',
   },
   {
     path: '/login',
@@ -71,8 +71,8 @@ router.beforeEach((to, from, next) => {
     // Redirect to login if not authenticated
     next('/login')
   } else if (to.meta.public && isAuthenticated.value) {
-    // Redirect to dashboard if already authenticated and trying to access public routes
-    next('/dashboard')
+    // Redirect to contacts if already authenticated and trying to access public routes
+    next('/contacts')
   } else {
     // Allow navigation
     next()
