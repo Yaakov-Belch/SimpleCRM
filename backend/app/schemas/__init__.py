@@ -1,6 +1,13 @@
 """Pydantic schemas for request/response validation."""
 
 from app.schemas.auth import AuthResponseSchema
+from app.schemas.contact import (
+    ContactCreateSchema,
+    ContactListResponseSchema,
+    ContactResponseSchema,
+    ContactUpdateSchema,
+    PipelineStatsResponseSchema,
+)
 from app.schemas.error import ErrorDetail, ErrorResponse
 from app.schemas.session import SessionResponseSchema
 from app.schemas.user import (
@@ -12,6 +19,11 @@ from app.schemas.user import (
 
 __all__ = [
     "AuthResponseSchema",
+    "ContactCreateSchema",
+    "ContactListResponseSchema",
+    "ContactResponseSchema",
+    "ContactUpdateSchema",
+    "PipelineStatsResponseSchema",
     "ErrorDetail",
     "ErrorResponse",
     "SessionResponseSchema",

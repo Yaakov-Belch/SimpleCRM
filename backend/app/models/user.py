@@ -25,5 +25,6 @@ class User(Base):
         onupdate=datetime.utcnow
     )
 
-    # Relationship to sessions
+    # Relationships
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")

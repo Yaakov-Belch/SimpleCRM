@@ -4,6 +4,9 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import ContactsView from '../views/ContactsView.vue'
+import ContactCreateView from '../views/ContactCreateView.vue'
+import ContactEditView from '../views/ContactEditView.vue'
 
 const routes = [
   {
@@ -32,6 +35,24 @@ const routes = [
     path: '/profile',
     name: 'Profile',
     component: ProfileView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/contacts',
+    name: 'Contacts',
+    component: ContactsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/contacts/new',
+    name: 'ContactCreate',
+    component: ContactCreateView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/contacts/:id/edit',
+    name: 'ContactEdit',
+    component: ContactEditView,
     meta: { requiresAuth: true },
   },
 ]

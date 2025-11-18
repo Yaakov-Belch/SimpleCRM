@@ -6,10 +6,31 @@
           <h1 class="text-xl font-bold">SimpleCRM</h1>
         </div>
         <div v-if="isAuthenticated" class="flex items-center gap-4">
-          <router-link to="/dashboard" class="hover:text-blue-200 transition">
+          <router-link
+            to="/dashboard"
+            :class="[
+              'hover:text-blue-200 transition',
+              $route.path === '/dashboard' ? 'font-semibold underline' : ''
+            ]"
+          >
             Dashboard
           </router-link>
-          <router-link to="/profile" class="hover:text-blue-200 transition">
+          <router-link
+            to="/contacts"
+            :class="[
+              'hover:text-blue-200 transition',
+              $route.path.startsWith('/contacts') ? 'font-semibold underline' : ''
+            ]"
+          >
+            Contacts
+          </router-link>
+          <router-link
+            to="/profile"
+            :class="[
+              'hover:text-blue-200 transition',
+              $route.path === '/profile' ? 'font-semibold underline' : ''
+            ]"
+          >
             Profile
           </router-link>
           <span class="text-blue-100">{{ currentUser?.full_name || 'User' }}</span>
@@ -26,10 +47,11 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
+const route = useRoute()
 const { currentUser, isAuthenticated, logout } = useAuth()
 
 async function handleLogout() {

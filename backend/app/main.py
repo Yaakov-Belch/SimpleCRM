@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.database import Base, engine
-from app.models import Session, User  # Import models to register them
-from app.routers import auth, users
+from app.models import Contact, Session, User  # Import models to register them
+from app.routers import auth, contacts, users
 
 # Configure logging
 logging.basicConfig(
@@ -82,6 +82,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Register routers
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(contacts.router)
 
 
 @app.get("/health")

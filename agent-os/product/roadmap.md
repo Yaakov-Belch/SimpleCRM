@@ -4,9 +4,9 @@
 
 1. [x] User Authentication & Account Management — Implement simple session-based authentication with registration, login, logout, and basic user profile management. `S`
 
-2. [ ] Contact Management System — Build full CRUD operations for contacts including name, email, phone, company, notes, and custom fields with a searchable contact list view. `M`
+2. [x] Contact Management System — Build full CRUD operations for contacts including name, email, phone, company, notes, and custom fields with a searchable contact list view. `M`
 
-3. [ ] Pipeline Stage Management — Create a 4-stage pipeline (Lead, Qualified, Proposal, Client) with the ability to assign contacts to stages and view stage-wise contact distribution. `S`
+3. [x] Pipeline Stage Management — Create a 4-stage pipeline (Lead, Qualified, Proposal, Client) with the ability to assign contacts to stages and view stage-wise contact distribution. `S`
 
 4. [ ] Activity Timeline & Notes — Implement activity logging system where users can record calls, meetings, emails, and general notes with timestamps, creating a chronological timeline per contact. `M`
 
