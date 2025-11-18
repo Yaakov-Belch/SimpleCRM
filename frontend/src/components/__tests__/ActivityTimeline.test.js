@@ -268,4 +268,121 @@ describe('ActivityTimeline', () => {
     expect(wrapper.vm.activities.length).toBe(1)
     expect(wrapper.vm.activities[0]).toEqual(newActivity)
   })
+
+  // CRITICAL TEST: Prop reactivity (prevents regression of the bug)
+  it('re-fetches activities when contactId prop changes', async () => {
+    const contact1Activities = [
+      {
+        id: 1,
+        type: 'Call',
+        subject: 'Contact 1 activity',
+        notes: 'For contact 1',
+        activity_date: '2024-01-15T10:30:00',
+        attachments: []
+      }
+    ]
+
+    const contact2Activities = [
+      {
+        id: 2,
+        type: 'Meeting',
+        subject: 'Contact 2 activity',
+        notes: 'For contact 2',
+        activity_date: '2024-01-16T10:30:00',
+        attachments: []
+      }
+    ]
+
+    // Mock API to return different data based on contactId
+    api.getActivitiesForContact.mockImplementation((contactId) => {
+      if (contactId === 1) {
+        return Promise.resolve({ activities: contact1Activities })
+      } else if (contactId === 2) {
+        return Promise.resolve({ activities: contact2Activities })
+      }
+      return Promise.resolve({ activities: [] })
+    })
+
+    // Mount with contactId: 1
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    // Verify first fetch
+    expect(api.getActivitiesForContact).toHaveBeenCalledWith(1)
+    expect(wrapper.vm.activities.length).toBe(1)
+    expect(wrapper.vm.activities[0].subject).toBe('Contact 1 activity')
+
+    // Change contactId prop to 2
+    await wrapper.setProps({ contactId: 2 })
+    await flushPromises()
+
+    // Verify second fetch
+    expect(api.getActivitiesForContact).toHaveBeenCalledWith(2)
+    expect(api.getActivitiesForContact).toHaveBeenCalledTimes(2)
+    expect(wrapper.vm.activities.length).toBe(1)
+    expect(wrapper.vm.activities[0].subject).toBe('Contact 2 activity')
+  })
+
+  // TEST: Stale data doesn't persist after contact change
+  it('shows correct activities after changing contact (no stale data)', async () => {
+    const contact1Activities = [
+      {
+        id: 1,
+        type: 'Call',
+        subject: 'Contact 1 activity',
+        notes: 'For contact 1',
+        activity_date: '2024-01-15T10:30:00',
+        attachments: []
+      }
+    ]
+
+    const contact2Activities = [
+      {
+        id: 2,
+        type: 'Email',
+        subject: 'Contact 2 activity',
+        notes: 'For contact 2',
+        activity_date: '2024-01-16T10:30:00',
+        attachments: []
+      }
+    ]
+
+    // First call returns contact1Activities
+    api.getActivitiesForContact.mockResolvedValueOnce({
+      activities: contact1Activities
+    })
+
+    // Mount with contactId: 1
+    const wrapper = mount(ActivityTimeline, {
+      props: {
+        contactId: 1
+      }
+    })
+
+    await flushPromises()
+
+    // Verify activities for contact 1
+    expect(wrapper.vm.activities.length).toBe(1)
+    expect(wrapper.vm.activities[0].subject).toBe('Contact 1 activity')
+
+    // Second call returns contact2Activities
+    api.getActivitiesForContact.mockResolvedValueOnce({
+      activities: contact2Activities
+    })
+
+    // Change contact to 2
+    await wrapper.setProps({ contactId: 2 })
+    await flushPromises()
+
+    // After fetch completes, should show only contact 2 activities (no stale data from contact 1)
+    expect(wrapper.vm.activities.length).toBe(1)
+    expect(wrapper.vm.activities[0].subject).toBe('Contact 2 activity')
+    expect(wrapper.text()).toContain('Contact 2 activity')
+    expect(wrapper.text()).not.toContain('Contact 1 activity')
+  })
 })

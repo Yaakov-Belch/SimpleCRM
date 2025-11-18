@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import ActivityItem from './ActivityItem.vue'
 import ActivityForm from './ActivityForm.vue'
 import { getActivitiesForContact, ApiError } from '../services/api'
@@ -130,6 +130,7 @@ const filteredActivities = computed(() => {
 
 async function fetchActivities() {
   loading.value = true
+  activities.value = []  // Clear stale data
 
   try {
     const response = await getActivitiesForContact(props.contactId)
@@ -199,7 +200,10 @@ function closeActivityForm() {
   selectedActivity.value = null
 }
 
-onMounted(() => {
-  fetchActivities()
-})
+// Watch contactId prop and re-fetch activities when it changes
+watch(() => props.contactId, (newContactId) => {
+  if (newContactId) {
+    fetchActivities()
+  }
+}, { immediate: true })  // immediate: true runs on initial mount
 </script>
